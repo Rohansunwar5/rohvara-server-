@@ -1,0 +1,87 @@
+name: Development Deployment Workflow
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push-ecr-image:
+    name: Build and Push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Fetch secret from AWS Secret Manager
+        run: |
+          secret_id="workplay.digital-backend-production"
+          aws secretsmanager get-secret-value \
+            --secret-id $secret_id \
+            --query 'SecretString' \
+            --output text > .env
+
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=date::$(date +'%Y-%m-%dT%H-%M-%S')"
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, Tag, and Push the Image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_NAME }}
+          VERSION_TAG: v${{ steps.date.outputs.date }}-production
+          IMAGE_TAG: production
+        run: |
+          docker build \
+          --build-arg DEPL_TYPE=production \
+          -t $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION_TAG .
+
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION_TAG
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$VERSION_TAG"
+
+  pull-and-start-app:
+    needs: build-and-push-ecr-image
+    name: Pull Image and Start App
+    runs-on: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Remove Data from Previous Deployment
+        run: sudo rm -rf data
+
+      - name: Initialize .env File - production
+        run: |
+          touch .env
+          echo NODE_ENV="production" >> .env
+          cat .env
+
+      - name: AWS ECR Login
+        run: sudo aws ecr get-login-password --region ap-south-1 |sudo docker login --username AWS --password-stdin ${{ secrets.AWS_ECR_LOGIN_URI }}
+
+      - name: Pull App Image
+        run: sudo docker pull ${{secrets.AWS_ECR_LOGIN_URI}}/${{ secrets.ECR_REPOSITORY_NAME }}:production
+
+      - name: Remove Old Containers
+        run: sudo docker rm ${{ secrets.ECR_REPOSITORY_NAME }} -f
+
+      - name: Docker Compose Up
+        run: sudo docker run -d --restart=unless-stopped -p 4010:4010 --add-host=host.docker.internal:host-gateway --name ${{ secrets.ECR_REPOSITORY_NAME }} ${{secrets.AWS_ECR_LOGIN_URI}}/${{ secrets.ECR_REPOSITORY_NAME }}:production
+
+      - name: Docker System Prune to Remove Old Images
+        run: sudo docker system prune -f -a

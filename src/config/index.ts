@@ -24,7 +24,7 @@ const config = {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET! as string,
   NOTIFY_TO: process.env.NOTIFY_TO! as string,
   JWT_CACHE_ENCRYPTION_KEY: process.env.JWT_CACHE_ENCRYPTION_KEY! as string,
-  DEFAULT_COUNTRY_CODE: 'IN'
+  DEFAULT_COUNTRY_CODE: 'IN',
 };
 
 export default config;

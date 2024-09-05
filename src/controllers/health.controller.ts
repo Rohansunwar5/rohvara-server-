@@ -18,7 +18,11 @@ export const helloWorld = (req: Request, res: Response, next: NextFunction) => {
   let all = {};
   if (req.query.all) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    all = { ...all, totalmem: os.totalmem() / 1000000000, freemem: os.freemem() / 1000000000 };
+    all = {
+      ...all,
+      totalmem: os.totalmem() / 1000000000,
+      freemem: os.freemem() / 1000000000,
+    };
   }
   next({
     message: 'Hello World - workplay.digital',
@@ -26,11 +30,15 @@ export const helloWorld = (req: Request, res: Response, next: NextFunction) => {
     instance: instanceRandomID,
     version: pjson.version,
     latest: pjson.version,
-    latestDeployedAt
+    latestDeployedAt,
   });
 };
 
-export const health = async (req: Request, res: Response, next: NextFunction) => {
+export const health = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   const key = 'healthCheck';
   await redisClient.setEx(key, 100, 'ok');
   const cached = await redisClient.get(key);
@@ -40,7 +48,12 @@ export const health = async (req: Request, res: Response, next: NextFunction) =>
   });
 };
 
-export const country = async (req: Request, res: Response, next: NextFunction) => {
-  const countryCode = req.headers['cf-ipcountry'] || config.DEFAULT_COUNTRY_CODE;
+export const country = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const countryCode =
+    req.headers['cf-ipcountry'] || config.DEFAULT_COUNTRY_CODE;
   next(countryCode);
 };

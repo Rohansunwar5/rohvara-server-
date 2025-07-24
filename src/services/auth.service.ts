@@ -3,19 +3,19 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { encodedJWTCacheManager } from './cache/entities';
 import { encode, encryptionKey } from './crypto.service';
-import { SuperUserRepository } from "../repository/superUser.repository";
+import { SuperUserRepository } from '../repository/superUser.repository';
 
-import { InternalServerError } from "../errors/internal-server.error";
-import { NotFoundError } from "../errors/not-found.error";
-import { UnauthorizedError } from "../errors/unauthorized.error";
+import { InternalServerError } from '../errors/internal-server.error';
+import { NotFoundError } from '../errors/not-found.error';
+import { UnauthorizedError } from '../errors/unauthorized.error';
 import { BadRequestError } from '../errors/bad-request.error';
 
 class AuthService {
   constructor(private readonly _superUserRepository:SuperUserRepository ) {}
-  
+
   async login(params: { username: string; password: string }) {
     const { username, password } = params;
-    
+
     const superUser = await this._superUserRepository.getSuperUserByUsername(username);
     if (!superUser) throw new NotFoundError('Super user not found');
     if (!superUser.password) throw new BadRequestError('Account setup incomplete');
@@ -41,7 +41,7 @@ class AuthService {
     lounge_name: string;
   }) {
     const { username, password, email, lounge_name } = params;
-    
+
     const existingUser = await this._superUserRepository.getSuperUserByUsername(username);
     if (existingUser) throw new BadRequestError('Username already exists');
 
@@ -68,7 +68,7 @@ class AuthService {
     const accessToken = await this.generateJWTToken(superUser._id);
     if (!accessToken) throw new InternalServerError('Failed to generate accessToken');
 
-    return { 
+    return {
       accessToken,
       user: {
         id: superUser._id,

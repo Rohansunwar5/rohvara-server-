@@ -1,5 +1,5 @@
-import { NextFunction, Request, Response } from "express";
-import sessionService from "../services/session.service";
+import { NextFunction, Request, Response } from 'express';
+import sessionService from '../services/session.service';
 
 export const startSession = async (req: Request, res: Response, next: NextFunction) => {
   const { player_id, device_id, minutes } = req.body;
@@ -13,7 +13,7 @@ export const startSession = async (req: Request, res: Response, next: NextFuncti
   });
 
   next(response);
-}
+};
 
 export const endSession = async (req: Request, res: Response, next: NextFunction) => {
   const { sessionId } = req.params;
@@ -28,7 +28,7 @@ export const endSession = async (req: Request, res: Response, next: NextFunction
   });
 
   next(response);
-}
+};
 
 export const getAllActiveSessions = async (req: Request, res: Response, next: NextFunction) => {
   const loungeId = req.superUser.loungeId;

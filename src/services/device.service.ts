@@ -1,12 +1,12 @@
-import { BadRequestError } from "../errors/bad-request.error";
-import { NotFoundError } from "../errors/not-found.error";
-import { DeviceStatus } from "../models/device.model";
-import { DeviceRepository, IAddGameParams, ICreateDeviceParams, IUpdateDeviceParams, IUpdateDeviceStatusParams } from "../repository/device.repository";
+import { BadRequestError } from '../errors/bad-request.error';
+import { NotFoundError } from '../errors/not-found.error';
+import { DeviceStatus } from '../models/device.model';
+import { DeviceRepository, IAddGameParams, ICreateDeviceParams, IUpdateDeviceParams, IUpdateDeviceStatusParams } from '../repository/device.repository';
 
 class DeviceService{
   constructor(private readonly _deviceRepository: DeviceRepository) {}
 
-  async registerDevice(params: { loungeId: string, pc_id: string, pc_name: string, ip_address: string, mac_address: string, specs?: {  ram?: string, gpu?: string, cpu?: string}}) 
+  async registerDevice(params: { loungeId: string, pc_id: string, pc_name: string, ip_address: string, mac_address: string, specs?: { ram?: string, gpu?: string, cpu?: string}})
   {
     const { loungeId, pc_id, pc_name, ip_address, mac_address, specs } = params;
 
@@ -24,8 +24,8 @@ class DeviceService{
             ram: null,
             gpu: null,
             cpu: null
-        } 
-    }
+        }
+    };
 
     const device = await this._deviceRepository.createDevice(loungeId, createDeviceParams);
 
@@ -75,7 +75,7 @@ class DeviceService{
 
   async getDeviceById(params: { loungeId: string; deviceId: string }) {
     const { loungeId, deviceId } = params;
-    
+
     const device = await this._deviceRepository.getDeviceById(loungeId, deviceId);
     if (!device) throw new NotFoundError('Device not found');
 
@@ -191,7 +191,7 @@ class DeviceService{
     const existingDevice = await this._deviceRepository.getDeviceById(loungeId, deviceId);
     if(!existingDevice) throw new NotFoundError('Device not Found');
 
-    const addGameParams: IAddGameParams = { device_id: deviceId, name: name, executable: executable, icon_path: icon_path || null }
+    const addGameParams: IAddGameParams = { device_id: deviceId, name: name, executable: executable, icon_path: icon_path || null };
 
     const updatedDevice = await this._deviceRepository.addGameToDevice(loungeId, addGameParams);
     if(!updatedDevice) throw new BadRequestError('Failed to add game to device');
@@ -203,10 +203,10 @@ class DeviceService{
         pc_name: updatedDevice.pc_name,
         installed_games: updatedDevice.installed_games
       }
-    }
+    };
   }
 
-  async removeGameFromDevice(params: { loungeId: string, deviceId: string, gameName: string }) 
+  async removeGameFromDevice(params: { loungeId: string, deviceId: string, gameName: string })
   {
     const { loungeId, deviceId, gameName } = params;
 
@@ -236,11 +236,11 @@ class DeviceService{
       in_use_devices: 0,
       offline_devices: 0,
       maintenance_devices: 0
-    }
+    };
 
     return {
       stats: deviceStats
-    }
+    };
   }
 
   async updateHeartbeat(params: { loungeId: string, pcId: string }) {
@@ -254,16 +254,16 @@ class DeviceService{
     return {
       success: true,
       timestamp: new Date().toString()
-    }
+    };
   }
 
   async getOfflineDevices(params: { loungeId: string, minutesOffline?: number }) {
     const { loungeId, minutesOffline } = params;
     const offLineThreshold = minutesOffline || 5;
-    
+
     const offlineDevices = await this._deviceRepository.getOfflineDevices(loungeId, offLineThreshold);
 
-    return { 
+    return {
       offline_devices: offlineDevices.map(device => ({
           id: device._id,
           pc_id: device.pc_id,
@@ -271,7 +271,7 @@ class DeviceService{
           last_heartbeat: device.last_heartbeat,
           minutes_offline: Math.floor((Date.now() - device.last_heartbeat.getTime()) / 60000)
       }))
-    }
+    };
   }
 }
 

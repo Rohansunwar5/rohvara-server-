@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 export enum CommandType {
     START_SESSION = 'START_SESSION',
     END_SESSION = 'END_SESSION',
-    LOCK_PC = 'LOCK_PC',  
+    LOCK_PC = 'LOCK_PC',
     UNLOCK_PC = 'UNLOCK_PC',
     ANNOUNCEMENT = 'ANNOUNCEMENT'
 }
@@ -58,7 +58,7 @@ const commandQueueSchema = new mongoose.Schema({
     },
     expires_at: {
         type: Date,
-        default: () => new Date(Date.now() + 5 * 60 * 1000) 
+        default: () => new Date(Date.now() + 5 * 60 * 1000)
     },
     created_by_id: {
         type: String,

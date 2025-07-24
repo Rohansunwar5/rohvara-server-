@@ -34,7 +34,7 @@ const getSuperUserAuthMiddlewareByJWTSecret = (jwtSecret: string) => async (
   req.user = {
     _id: userId,
   };
-  
+
   req.access_token = token;
   req.loungeId = userId;
   req.superUser = {

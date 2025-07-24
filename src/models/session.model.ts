@@ -85,7 +85,7 @@ sessionSchema.index({ lounge_id: 1, player_id: 1 });
 sessionSchema.index({ lounge_id: 1, device_id: 1 });
 sessionSchema.index({ lounge_id: 1, status: 1 });
 sessionSchema.index({ lounge_id: 1, session_start: -1 });
-sessionSchema.index({ lounge_id: 1, status: 1, remaining_minutes: 1 }); 
+sessionSchema.index({ lounge_id: 1, status: 1, remaining_minutes: 1 });
 
 export interface ISession extends mongoose.Document {
     lounge_id: string;

@@ -1,5 +1,5 @@
 import { validateRequest } from '.';
-import { isRequired, isMongoId, isNumeric, isIn, isGreaterThanZero } from '../../utils/validator.utils';
+import { isRequired, isMongoId, isIn, isGreaterThanZero } from '../../utils/validator.utils';
 
 export const createPlayerValidator = [
   isRequired('username'),

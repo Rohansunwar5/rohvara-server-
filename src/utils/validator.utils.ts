@@ -11,7 +11,7 @@ export const checkValidate = (validator: ValidationChain, optional = false): Mid
 export const isMongoId = (key: string, optional?: boolean): Middleware => {
   return checkValidate(check(key).isMongoId().withMessage(`Invalid ${key}`), optional);
 };
- 
+
 export const isNumeric = (key: string, optional?: boolean): Middleware => {
   return checkValidate(check(key).isNumeric().withMessage(`${key} should be numeric`), optional);
 };

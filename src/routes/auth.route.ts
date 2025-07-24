@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asynchandler';
-import { login, profile, signup, 
+import { login, profile, signup,
 } from '../controllers/auth.controller';
 import isLoggedIn from '../middlewares/isLoggedIn.middleware';
 

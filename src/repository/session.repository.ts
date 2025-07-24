@@ -1,4 +1,4 @@
-import sessionModel, { EndedBy, SessionStatus } from "../models/session.model";
+import sessionModel, { EndedBy, SessionStatus } from '../models/session.model';
 
 export interface ICreateSessionParams {
     player_id: string;
@@ -33,7 +33,7 @@ export class SessionRepository {
             remaining_minutes: params.allocated_minutes,
             credits_used: params.credits_used,
             status: SessionStatus.ACTIVE
-        })
+        });
     }
 
     async getSessionById(loungeId: string, sessionId: string) {
@@ -45,7 +45,7 @@ export class SessionRepository {
             lounge_id: loungeId,
             player_id: playerId,
             status: SessionStatus.ACTIVE
-        })
+        });
     }
 
     async getActiveSessionByDevice(loungeId: string, deviceId: string) {
@@ -53,7 +53,7 @@ export class SessionRepository {
             lounge_id: loungeId,
             device_id: deviceId,
             status: SessionStatus.ACTIVE
-        })
+        });
     }
 
     async getActiveSessionByPcId(loungeId: string, pcId: string) {
@@ -72,6 +72,7 @@ export class SessionRepository {
     }
 
     async getAllSessions(loungeId: string, status?: SessionStatus) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const filter: any = { lounge_id: loungeId };
         if(status) filter.status = status;
 
@@ -79,6 +80,7 @@ export class SessionRepository {
     }
 
     async updateSession(loungeId: string, params: IUpdateSessionParams) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: any = {};
 
         if (params.remaining_minutes !== null) {
@@ -119,8 +121,8 @@ export class SessionRepository {
                 remaining_minutes: remainingMinutes,
                 updated_at: new Date()
             },
-            { new: true  }
-        )
+            { new: true }
+        );
     }
 
     async endSession(loungeId: string, sessionId: string, endedBy: EndedBy, notes?: string) {
@@ -134,7 +136,7 @@ export class SessionRepository {
                 updated_at: new Date ()
             },
             { new: true }
-        )
+        );
     }
 
     async getExpiredSessions(loungeId: string) {

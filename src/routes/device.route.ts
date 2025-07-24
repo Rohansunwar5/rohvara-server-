@@ -1,10 +1,10 @@
-import { Router } from "express";
-import { asyncHandler } from "../utils/asynchandler";
-import { addGameToDevice, getAllDevices, getDeviceById, getDeviceStats, getOfflineDevices, registerDevice, removeGameFromDevice, updateDevice, updateDeviceStatus, updateHeartbeat } from "../controllers/device.controller";
-import isLoggedIn from "../middlewares/isLoggedIn.middleware";
-import { addGameValidator, deviceIdValidator, deviceStatusValidator, minutesOfflineValidator, pcIdValidator, registerDeviceValidator, removeGameValidator, updateDeviceStatusValidator, updateDeviceValidator } from "../middlewares/validators/device.validator";
+import { Router } from 'express';
+import { asyncHandler } from '../utils/asynchandler';
+import { addGameToDevice, getAllDevices, getDeviceById, getDeviceStats, getOfflineDevices, registerDevice, removeGameFromDevice, updateDevice, updateDeviceStatus, updateHeartbeat } from '../controllers/device.controller';
+import isLoggedIn from '../middlewares/isLoggedIn.middleware';
+import { addGameValidator, deviceIdValidator, deviceStatusValidator, minutesOfflineValidator, pcIdValidator, registerDeviceValidator, removeGameValidator, updateDeviceStatusValidator, updateDeviceValidator } from '../middlewares/validators/device.validator';
 
-const deviceRouter = Router()
+const deviceRouter = Router();
 
 deviceRouter.post('/', isLoggedIn, registerDeviceValidator, asyncHandler(registerDevice));
 deviceRouter.get('/', isLoggedIn, deviceStatusValidator, asyncHandler(getAllDevices));

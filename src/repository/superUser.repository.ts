@@ -1,4 +1,4 @@
-import superUserModel, { ISuperUser } from "../models/superUser.model";
+import superUserModel from '../models/superUser.model';
 
 
 export interface ICreateSuperUserParams {
@@ -41,16 +41,17 @@ export class SuperUserRepository {
     }
 
     async updateSuperUser(params: IUpdateSuperUserParams) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: any = {};
-        
+
         if (params.email !== null) {
             updateData.email = params.email;
         }
-        
+
         if (params.lounge_name) {
             updateData.lounge_name = params.lounge_name;
         }
-        
+
         if (params.settings) {
             updateData.settings = params.settings;
         }
@@ -68,8 +69,8 @@ export class SuperUserRepository {
 
     async updatePassword(id: string, hashedPassword: string) {
         return this._model.findByIdAndUpdate(
-            id, 
-            { password: hashedPassword }, 
+            id,
+            { password: hashedPassword },
             { new: true }
         ).select('-password');
     }

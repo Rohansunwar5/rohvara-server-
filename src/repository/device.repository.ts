@@ -1,4 +1,4 @@
-import deviceModel, { DeviceStatus, IDevice } from "../models/device.model";
+import deviceModel, { DeviceStatus, IDevice } from '../models/device.model';
 
 export interface ICreateDeviceParams {
     pc_id: string;
@@ -50,6 +50,7 @@ export class DeviceRepository {
     }
 
     async getAllDevices(loungeId: string, status?: DeviceStatus) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const filter: any = { lounge_id: loungeId };
         if(status) filter.status = status;
 
@@ -74,20 +75,21 @@ export class DeviceRepository {
     }
 
     async updateDevice(loungeId: string, params: IUpdateDeviceParams): Promise<IDevice | null> {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: any = {};
-        
+
         if (params.pc_name) {
             updateData.pc_name = params.pc_name;
         }
-        
+
         if (params.ip_address) {
             updateData.ip_address = params.ip_address;
         }
-        
+
         if (params.mac_address !== null) {
             updateData.mac_address = params.mac_address;
         }
-        
+
         if (params.specs) {
             updateData.specs = params.specs;
         }
@@ -100,6 +102,7 @@ export class DeviceRepository {
     }
 
     async updateDeviceStatus(loungeId: string, params: IUpdateDeviceStatusParams): Promise<IDevice | null> {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: any = {
             status: params.status,
             last_heartbeat: new Date()
@@ -127,7 +130,7 @@ export class DeviceRepository {
                 last_heartbeat: new Date(),
                 status: DeviceStatus.AVAILABLE
             }
-        )
+        );
     }
 
     async addGameToDevice(loungeId: string, params: IAddGameParams): Promise<IDevice | null> {
@@ -144,7 +147,7 @@ export class DeviceRepository {
         );
     }
 
-    async removeGameFromDevice(loungeId: string, deviceId: string, gameName: string): Promise<IDevice | null> {
+    async removeGameFromDevice(loungeId: string, deviceId: string, gameName: string) {
         return this._model.findOneAndUpdate(
             { lounge_id: loungeId, _id: deviceId },
             { $pull: { installed_games: { name: gameName } } },
@@ -152,7 +155,7 @@ export class DeviceRepository {
         );
     }
 
-    async getDeviceStats(loungeId: string): Promise<any> {
+    async getDeviceStats(loungeId: string) {
         return this._model.aggregate([
             { $match: { lounge_id: loungeId } },
             {
@@ -178,7 +181,7 @@ export class DeviceRepository {
 
     async getOfflineDevices(loungeId: string, minutesOffline: number): Promise<IDevice[]> {
         const cutoffTime = new Date(Date.now() - minutesOffline * 60 * 1000);
-        
+
         return this._model.find({
             lounge_id: loungeId,
             last_heartbeat: { $lt: cutoffTime },

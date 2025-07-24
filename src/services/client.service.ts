@@ -1,14 +1,15 @@
 import bcrypt from 'bcrypt';
-import { NotFoundError } from "../errors/not-found.error";
-import { UnauthorizedError } from "../errors/unauthorized.error";
-import { CommandQueueRepository } from "../repository/commandQueue.repository";
-import { DeviceRepository } from "../repository/device.repository";
-import { PlayerRepository } from "../repository/player.repository";
-import { SessionRepository } from "../repository/session.repository";
+import { NotFoundError } from '../errors/not-found.error';
+import { UnauthorizedError } from '../errors/unauthorized.error';
+import { CommandQueueRepository } from '../repository/commandQueue.repository';
+import { DeviceRepository } from '../repository/device.repository';
+import { PlayerRepository } from '../repository/player.repository';
+import { SessionRepository } from '../repository/session.repository';
 import { DeviceStatus } from '../models/device.model';
 import { BadRequestError } from '../errors/bad-request.error';
 import { CommandType } from '../models/commandQueue.model';
 import { EndedBy, SessionStatus } from '../models/session.model';
+import logger from '../utils/logger';
 
 class ClientService {
     constructor (
@@ -33,7 +34,7 @@ class ClientService {
         // Get player by username in this lounge
         const player = await this._playerRepository.getPlayerByUsername(loungeId, username);
         if (!player) throw new NotFoundError('Invalid username or password');
-        
+
         if (player.status !== 'active') {
             throw new UnauthorizedError('Player account is not active');
         }
@@ -64,7 +65,7 @@ class ClientService {
                 message: `Welcome ${player.display_name || player.username}!`
             },
             created_by_id: player._id
-        })
+        });
 
         return {
             success: true,
@@ -153,14 +154,14 @@ class ClientService {
     // If there's an active session, update session info
     if (device.current_session_id) {
         const session = await this._sessionRepository.getSessionById(loungeId, device.current_session_id);
-        
+
         if (session && session.status === SessionStatus.ACTIVE) {
             // Handle session time update
             const hasValidSessionTime = typeof currentSessionTime === 'number' && currentSessionTime >= 0;
             if (hasValidSessionTime) {
                 await this._sessionRepository.updateSessionTime(
-                    loungeId, 
-                    session._id, 
+                    loungeId,
+                    session._id,
                     currentSessionTime as number
                 );
             }
@@ -221,7 +222,7 @@ class ClientService {
             pc_id: pcId,
             timestamp: new Date().toISOString(),
             status: 'heartbeat_updated'
-        }
+        };
     }
 
     async sessionLogout(params: { pcId: string; sessionId: string }) {
@@ -280,7 +281,7 @@ class ClientService {
         const loungeId = device.lounge_id;
 
         // Log error (you might want to create an ErrorLog model for this)
-        console.error(`PC Error - ${pcId}:`, {
+        logger.error(`PC Error - ${pcId}:`, {
             type: errorType,
             message: errorMessage,
             sessionId: sessionId || null,

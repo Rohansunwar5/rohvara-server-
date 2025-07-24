@@ -58,7 +58,7 @@ const venueSchema = new mongoose.Schema({
             maxSessionDuration: {
             type: Number,
             required: true,
-            default: 480 
+            default: 480
         }
     }
 }, { timestamps: true });
@@ -79,7 +79,7 @@ export interface IVenue extends mongoose.Schema {
             open: string;
             close: string;
         };
-        maxSessionDuration: number; 
+        maxSessionDuration: number;
     };
 }
 

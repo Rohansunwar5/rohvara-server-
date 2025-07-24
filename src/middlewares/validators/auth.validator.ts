@@ -1,5 +1,5 @@
 import { validateRequest } from '.';
-import { isRequired, isMaxRequired } from '../../utils/validator.utils';
+import { isRequired } from '../../utils/validator.utils';
 
 export const signupValidator = [
   isRequired('username'),

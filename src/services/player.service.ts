@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
-import { BadRequestError } from "../errors/bad-request.error";
-import { PlayerRepository } from "../repository/player.repository";
-import { TransactionRepository } from "../repository/transaction.repository";
+import { BadRequestError } from '../errors/bad-request.error';
+import { PlayerRepository } from '../repository/player.repository';
+import { TransactionRepository } from '../repository/transaction.repository';
 import { NotFoundError } from '../errors/not-found.error';
 import { TransactionType } from '../models/transaction.model';
 import { PlayerStatus } from '../models/player.model';
@@ -14,14 +14,14 @@ class PlayerService {
 
         const existingPlayer = await this._playerRepository.getPlayerByUsername(loungeId, username);
         if (existingPlayer) {
-            throw new BadRequestError('Username already exisits in this lounge')
+            throw new BadRequestError('Username already exisits in this lounge');
         }
 
         const hanshedPassword = await bcrypt.hash(password, 10);
 
         const player = await this._playerRepository.createPlayer(loungeId, { username, password: hanshedPassword, display_name, phone, created_by_id: createdById});
 
-        return { 
+        return {
             player: {
             id: player._id,
             username: player.username,
@@ -31,7 +31,7 @@ class PlayerService {
             status: player.status,
             createdAt: player.createdAt
             }
-        }
+        };
     }
 
     async addCredits(params: { loungeId: string, playerId: string, minutes: number, price: number, createdById: string }) {
@@ -43,7 +43,7 @@ class PlayerService {
         const updatedPlayer = await this._playerRepository.addCredits(loungeId, {
             player_id: playerId,
             amount: minutes
-        });        
+        });
 
         if (!updatedPlayer) throw new BadRequestError('Failed to add credits');
 
@@ -74,6 +74,7 @@ class PlayerService {
 
     async getAllPlayers(params: { loungeId: string; status?: string }) {
         const { loungeId, status } = params;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const players = await this._playerRepository.getAllPlayers(loungeId, status as any);
 
         return {
@@ -94,7 +95,7 @@ class PlayerService {
     async getPlayerById(params: { loungeId: string; playerId: string }) {
         const { loungeId, playerId } = params;
         const player = await this._playerRepository.getPlayerById(loungeId, playerId);
-        
+
         if (!player) throw new NotFoundError('Player not found');
 
         const transactions = await this._transactionRepository.getTransactionsByPlayer(loungeId, playerId);
@@ -127,7 +128,7 @@ class PlayerService {
 
         const existingPlayer = await this._playerRepository.getPlayerById(loungeId, playerId);
         if (!existingPlayer) throw new NotFoundError('Player not found');
-        
+
         let playerStatus: PlayerStatus | undefined;
         if (status === 'active') playerStatus = PlayerStatus.ACTIVE;
         else if (status === 'suspended') playerStatus = PlayerStatus.SUSPENDED;
@@ -160,7 +161,7 @@ class PlayerService {
         };
     }
 
-    async getPlayerTransactions(params: { loungeId: string; playerId: string }) {
+    async getPlayerTransactions(params: { loungeId: string, playerId: string }) {
         const { loungeId, playerId } = params;
 
         const player = await this._playerRepository.getPlayerById(loungeId, playerId);
@@ -191,9 +192,9 @@ class PlayerService {
 
     async getDailyRevenue(params: { loungeId: string; date: Date }) {
         const { loungeId, date } = params;
-        
+
         const revenueData = await this._transactionRepository.getDailyRevenue(loungeId, date);
-        
+
         const revenue = revenueData[0] || {
         total_revenue: 0,
         total_credits_sold: 0,
@@ -209,7 +210,7 @@ class PlayerService {
     async getPlayerStats(params: { loungeId: string }) {
         const { loungeId } = params;
         const stats = await this._playerRepository.getPlayerStats(loungeId);
-        
+
         const playerStats = stats[0] || {
         total_players: 0,
         active_players: 0,

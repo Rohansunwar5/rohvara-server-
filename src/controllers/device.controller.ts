@@ -1,16 +1,15 @@
-import { NextFunction, Request, Response } from "express";
-import deviceService from "../services/device.service";
+import { NextFunction, Request, Response } from 'express';
+import deviceService from '../services/device.service';
 
 export const registerDevice = async (req:Request, res: Response, next: NextFunction) => {
   const { pc_id, pc_name, ip_address, mac_address, specs } = req.body;
-  const { _id } = req.superUser;
   const loungeId = req.superUser.loungeId;
 
   const response = await deviceService.registerDevice({ loungeId, pc_id, pc_name, ip_address, mac_address, specs });
 
   next(response);
 
-}
+};
 
 export const getAllDevices = async (req: Request, res: Response, next: NextFunction) => {
   const { status } = req.query;
@@ -19,7 +18,7 @@ export const getAllDevices = async (req: Request, res: Response, next: NextFunct
   const response = await deviceService.getAllDevices({ loungeId, status: status as string });
 
   next(response);
-}
+};
 
 export const getDeviceById = async (req: Request, res: Response, next: NextFunction) => {
   const { deviceId } = req.params;

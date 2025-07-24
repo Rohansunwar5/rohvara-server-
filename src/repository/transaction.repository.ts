@@ -1,4 +1,4 @@
-import transactionModel, { ITransaction, TransactionType } from "../models/transaction.model";
+import transactionModel, { ITransaction, TransactionType } from '../models/transaction.model';
 
 export interface ICreateTransactionParams {
   player_id: string;
@@ -23,15 +23,16 @@ export class TransactionRepository {
     }
 
     async getTransactionsByPlayer(loungeId: string, playerId: string): Promise<ITransaction[]> {
-        return this._model.find({ 
-        lounge_id: loungeId, 
-        player_id: playerId 
+        return this._model.find({
+        lounge_id: loungeId,
+        player_id: playerId
         }).sort({ createdAt: -1 });
     }
 
     async getAllTransactions( loungeId: string, type?: TransactionType, startDate?: Date,endDate?: Date ): Promise<ITransaction[]> {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const filter: any = { lounge_id: loungeId };
-        
+
         if (type) filter.type = type;
         if (startDate || endDate) {
         filter.createdAt = {};
@@ -42,10 +43,10 @@ export class TransactionRepository {
         return this._model.find(filter).sort({ createdAt: -1 });
     }
 
-    async getDailyRevenue(loungeId: string, date: Date): Promise<any> {
+    async getDailyRevenue(loungeId: string, date: Date) {
         const startOfDay = new Date(date);
         startOfDay.setHours(0, 0, 0, 0);
-        
+
         const endOfDay = new Date(date);
         endOfDay.setHours(23, 59, 59, 999);
 

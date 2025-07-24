@@ -20,5 +20,5 @@ export interface VenueSettings {
         open: string;
         close: string;
     };
-    maxSessionDuration: number; 
+    maxSessionDuration: number;
 }

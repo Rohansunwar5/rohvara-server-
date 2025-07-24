@@ -1,4 +1,4 @@
-import commandQueueModel, { CommandQueueStatus, CommandType } from "../models/commandQueue.model";
+import commandQueueModel, { CommandQueueStatus, CommandType } from '../models/commandQueue.model';
 
 export interface ICreateCommandParams {
     pc_id: string;
@@ -22,7 +22,7 @@ export class CommandQueueRepository {
             command: params.command,
             data: params.data,
             created_by_id: params.created_by_id
-        })
+        });
     }
 
     async getPendingCommands(loungeId: string, pcId: string) {
@@ -47,9 +47,9 @@ export class CommandQueueRepository {
 
     async markCommandsAsExecuted(loungeId: string, commandIds: string[]) {
         await this._model.updateMany(
-            { 
-                lounge_id: loungeId, 
-                _id: { $in: commandIds } 
+            {
+                lounge_id: loungeId,
+                _id: { $in: commandIds }
             },
             {
                 status: CommandQueueStatus.EXECUTED,

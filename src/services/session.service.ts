@@ -1,12 +1,12 @@
-import { BadRequestError } from "../errors/bad-request.error";
-import { NotFoundError } from "../errors/not-found.error";
-import { DeviceStatus } from "../models/device.model";
-import { EndedBy, SessionStatus } from "../models/session.model";
-import { TransactionType } from "../models/transaction.model";
-import { DeviceRepository } from "../repository/device.repository";
-import { PlayerRepository } from "../repository/player.repository";
-import { ICreateSessionParams, IUpdateSessionParams, SessionRepository } from "../repository/session.repository";
-import { TransactionRepository } from "../repository/transaction.repository";
+import { BadRequestError } from '../errors/bad-request.error';
+import { NotFoundError } from '../errors/not-found.error';
+import { DeviceStatus } from '../models/device.model';
+import { EndedBy, SessionStatus } from '../models/session.model';
+import { TransactionType } from '../models/transaction.model';
+import { DeviceRepository } from '../repository/device.repository';
+import { PlayerRepository } from '../repository/player.repository';
+import { ICreateSessionParams, IUpdateSessionParams, SessionRepository } from '../repository/session.repository';
+import { TransactionRepository } from '../repository/transaction.repository';
 
 class SessionService {
     constructor(
@@ -116,7 +116,7 @@ class SessionService {
         if(!session) throw new NotFoundError('Session not found');
 
         if(session.status !== SessionStatus.ACTIVE) {
-            throw new BadRequestError('Session is not active')
+            throw new BadRequestError('Session is not active');
         }
 
         let sessionEndedBy: EndedBy;
@@ -127,11 +127,11 @@ class SessionService {
         else throw new BadRequestError('Invalid ended_by value');
 
         const endedSession = await this._sessionRepository.endSession(
-            loungeId, 
-            sessionId, 
-            sessionEndedBy, 
-            notes 
-        )
+            loungeId,
+            sessionId,
+            sessionEndedBy,
+            notes
+        );
 
         if(!endedSession) throw new BadRequestError('Failed to end session');
 
@@ -155,7 +155,7 @@ class SessionService {
                 ended_by: endedSession.ended_by,
                 notes: endedSession.notes
             }
-        }
+        };
     }
 
     async getAllActiveSessions(params: { loungeId: string }) {
@@ -175,7 +175,7 @@ class SessionService {
                 session_start: session.session_start,
                 createdAt: session.createdAt
             }))
-        }
+        };
     }
 
     async getAllSessions(params: { loungeId: string, status?: string }) {
@@ -243,14 +243,14 @@ class SessionService {
 
         const session = await this._sessionRepository.getSessionById(loungeId, sessionId);
         if (!session) throw new NotFoundError('Session not found');
-        
+
         if (session.status !== SessionStatus.ACTIVE) {
             throw new BadRequestError('Session is not active');
         }
 
         const updatedSession = await this._sessionRepository.updateSessionTime(
-            loungeId, 
-            sessionId, 
+            loungeId,
+            sessionId,
             remainingMinutes
         );
 
@@ -270,21 +270,21 @@ class SessionService {
 
         const session = await this._sessionRepository.getSessionById(loungeId, sessionId);
         if (!session) throw new NotFoundError('Session not found');
-        
+
         if (session.status !== SessionStatus.ACTIVE) {
             throw new BadRequestError('Session is not active');
         }
 
         const player = await this._playerRepository.getPlayerById(loungeId, session.player_id);
         if (!player) throw new NotFoundError('Player not found');
-        
+
         if (player.credit_balance < additionalMinutes) {
             throw new BadRequestError('Insufficient credits to extend session');
         }
 
         const deductedPlayer = await this._playerRepository.deductCredits(
-            loungeId, 
-            session.player_id, 
+            loungeId,
+            session.player_id,
             additionalMinutes
         );
 
@@ -292,7 +292,7 @@ class SessionService {
 
         const newRemainingMinutes = session.remaining_minutes + additionalMinutes;
         const newAllocatedMinutes = session.allocated_minutes + additionalMinutes;
-        
+
         const updateParams: IUpdateSessionParams = {
             _id: sessionId,
             remaining_minutes: newRemainingMinutes
@@ -309,9 +309,9 @@ class SessionService {
             description: `Session extended by ${additionalMinutes} minutes`,
             session_id: sessionId,
             created_by_id: createdById
-        })
+        });
 
-        return { 
+        return {
             session: {
                 id: updatedSession._id,
                 allocated_minutes: newAllocatedMinutes,
@@ -322,7 +322,7 @@ class SessionService {
                 id: deductedPlayer._id,
                 credit_balance: deductedPlayer.credit_balance
             }
-        }
+        };
     }
 
     async getSessionStats(params: { loungeId: string }) {

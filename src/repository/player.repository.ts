@@ -1,4 +1,4 @@
-import playerModel, { IPlayer, PlayerStatus } from "../models/player.model";
+import playerModel, { IPlayer, PlayerStatus } from '../models/player.model';
 
 export interface ICreatePlayerParams {
     username: string;
@@ -17,7 +17,7 @@ export interface IUpdatePlayerParams {
 
 export interface IAddCreditsParams {
     player_id: string;
-    amount: number;   
+    amount: number;
 }
 
 export class PlayerRepository {
@@ -32,9 +32,10 @@ export class PlayerRepository {
     }
 
     async getAllPlayers(loungeId: string, status?: PlayerStatus): Promise<IPlayer[]> {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const filter: any = { lounge_id: loungeId };
         if (status) filter.status = status;
-        
+
         return this._model.find(filter).select('-password').sort({ createdAt: -1 });
     }
 
@@ -65,7 +66,7 @@ export class PlayerRepository {
         const { player_id, amount } = params;
         return this._model.findOneAndUpdate(
         { lounge_id: loungeId, _id: player_id },
-        { 
+        {
             $inc: { credit_balance: amount },
             last_login: new Date()
         },
@@ -75,13 +76,13 @@ export class PlayerRepository {
 
     async deductCredits(loungeId: string, playerId: string, amount: number) {
         return this._model.findOneAndUpdate(
-        { 
-            lounge_id: loungeId, 
+        {
+            lounge_id: loungeId,
             _id: playerId,
-            credit_balance: { $gte: amount } 
+            credit_balance: { $gte: amount }
         },
-        { 
-            $inc: { 
+        {
+            $inc: {
             credit_balance: -amount,
             total_spent: amount
             }
@@ -97,7 +98,7 @@ export class PlayerRepository {
         );
     }
 
-    async getPlayerStats(loungeId: string): Promise<any> {
+    async getPlayerStats(loungeId: string) {
         return this._model.aggregate([
         { $match: { lounge_id: loungeId } },
         {

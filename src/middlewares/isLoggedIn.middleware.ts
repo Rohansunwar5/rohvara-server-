@@ -1,10 +1,10 @@
 import config from '../config';
-import requireAuth from './auth/require-auth.middleware';
-import getAuthMiddlewareByJWTSecret from './auth/verify-token.middleware';
+import requireSuperUserAuth from './auth/require-superuser-auth.middleware';
+import getSuperUserAuthMiddlewareByJWTSecret from './auth/verify-superuser-token.middleware';
 
 const isLoggedIn = [
-  getAuthMiddlewareByJWTSecret(config.JWT_SECRET),
-  requireAuth,
+  getSuperUserAuthMiddlewareByJWTSecret(config.JWT_SECRET),
+  requireSuperUserAuth,
 ];
 
 export default isLoggedIn;

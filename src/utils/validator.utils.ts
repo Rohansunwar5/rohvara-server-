@@ -11,7 +11,7 @@ export const checkValidate = (validator: ValidationChain, optional = false): Mid
 export const isMongoId = (key: string, optional?: boolean): Middleware => {
   return checkValidate(check(key).isMongoId().withMessage(`Invalid ${key}`), optional);
 };
-
+ 
 export const isNumeric = (key: string, optional?: boolean): Middleware => {
   return checkValidate(check(key).isNumeric().withMessage(`${key} should be numeric`), optional);
 };
@@ -74,4 +74,40 @@ export const isStringOrArrayOfString = (key: string, optional?: boolean): Middle
         return true;
       } else return false;
     }).withMessage(`${key} should be a string or an array of string`), optional);
+};
+
+export const isEmail = (key: string, optional?: boolean): Middleware => {
+  return checkValidate(check(key)
+    .isEmail()
+    .withMessage(`${key} should be a valid email address.`), optional);
+};
+
+export const isIP = (key: string, optional?: boolean): Middleware => {
+  return checkValidate(check(key)
+    .isIP()
+    .withMessage(`${key} should be a valid IP address.`), optional);
+};
+
+export const isMACAddress = (key: string, optional?: boolean): Middleware => {
+  return checkValidate(check(key)
+    .isMACAddress()
+    .withMessage(`${key} should be a valid MAC address.`), optional);
+};
+
+export const isLength = (key: string, min: number, max: number, optional?: boolean): Middleware => {
+  return checkValidate(check(key)
+    .isLength({ min, max })
+    .withMessage(`${key} should be between ${min}-${max} characters.`), optional);
+};
+
+export const isISO8601 = (key: string, optional?: boolean): Middleware => {
+  return checkValidate(check(key)
+    .isISO8601()
+    .withMessage(`${key} should be a valid date in ISO format.`), optional);
+};
+
+export const isMobilePhone = (key: string, optional?: boolean): Middleware => {
+  return checkValidate(check(key)
+    .isMobilePhone('any')
+    .withMessage(`${key} should be a valid phone number.`), optional);
 };

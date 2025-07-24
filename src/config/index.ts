@@ -24,6 +24,9 @@ const config = {
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET! as string,
   NOTIFY_TO: process.env.NOTIFY_TO! as string,
   JWT_CACHE_ENCRYPTION_KEY: process.env.JWT_CACHE_ENCRYPTION_KEY! as string,
+  SOCKET_PORT: parseInt(process.env.SOCKET_PORT || '3001', 10),
+  VENUE_KEY: process.env.VENUE_KEY || 'default-venue-key',
+  LOG_LEVEL: process.env.LOG_LEVEL || 'info',
   DEFAULT_COUNTRY_CODE: 'IN',
 };
 

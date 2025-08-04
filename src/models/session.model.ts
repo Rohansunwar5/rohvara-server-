@@ -77,7 +77,15 @@ const sessionSchema = new mongoose.Schema({
         type: String,
         trim: true,
         default: null
-    }
+    },
+    session_end_time: {
+        type: Date,
+        required: true
+    },
+    warning_time: {
+        type: Date,
+        required: true
+    },
 }, { timestamps: true });
 
 
@@ -104,6 +112,8 @@ export interface ISession extends mongoose.Document {
     notes: string | null;
     createdAt: Date;
     updatedAt: Date;
+    session_end_time: Date;
+    warning_time: Date;
 }
 
 export default mongoose.model<ISession>('Session', sessionSchema);

@@ -43,6 +43,131 @@ class DeviceService{
     };
   }
 
+  async registerDiscoveredDevice(params: {loungeId: string, pc_id: string, pc_name: string, ip_address: string, mac_address?: string, specs?: { ram?: string, gpu?: string, cpu?: string } }) {
+    const { loungeId, pc_id, pc_name, ip_address, mac_address, specs } = params;
+
+    // console.log(`📝 Registering discovered device: ${pc_name} (${ip_address})`);
+
+    const existingDevice = await this._deviceRepository.checkDeviceExists(loungeId, pc_id, ip_address);
+    if (existingDevice) {
+      throw new BadRequestError(`Device already registered: ${existingDevice.pc_id}`);
+    }
+
+    const device = await this._deviceRepository.createDevice(loungeId, {
+      pc_id,
+      pc_name,
+      ip_address,
+      mac_address: mac_address || null,
+      specs: specs || { ram: null, gpu: null, cpu: null }
+    });
+
+    // console.log(`✅ Device registered successfully: ${device.pc_name} (${device.ip_address})`);
+
+    return {
+      device: {
+        id: device._id,
+        pc_id: device.pc_id,
+        pc_name: device.pc_name,
+        ip_address: device.ip_address,
+        mac_address: device.mac_address,
+        status: device.status,
+        specs: device.specs,
+        createdAt: device.createdAt
+      }
+    };
+  }
+
+  async registerMultipleDevices(params: {
+    loungeId: string,
+    devices: Array<{
+      pc_id: string;
+      pc_name: string;
+      ip_address: string;
+      mac_address?: string;
+      specs?: { ram?: string, gpu?: string, cpu?: string };
+    }>
+  }) {
+    const { loungeId, devices } = params;
+
+    if (!Array.isArray(devices) || devices.length === 0) {
+      throw new BadRequestError('No devices provided for registration');
+    }
+
+    // console.log(`📝 Bulk registering ${devices.length} devices`);
+
+    const registeredDevices = [];
+    const errors = [];
+
+    for (const deviceData of devices) {
+      try {
+        const { pc_id, pc_name, ip_address, mac_address, specs } = deviceData;
+
+        // Check if device already exists
+        const existingDevice = await this._deviceRepository.checkDeviceExists(loungeId, pc_id, ip_address);
+        if (existingDevice) {
+          errors.push({
+            pc_id,
+            error: 'Device already registered'
+          });
+          continue;
+        }
+
+        // Register the device
+        const device = await this._deviceRepository.createDevice(loungeId, {
+          pc_id,
+          pc_name,
+          ip_address,
+          mac_address: mac_address || null,
+          specs: specs || { ram: null, gpu: null, cpu: null }
+        });
+
+        registeredDevices.push({
+          id: device._id,
+          pc_id: device.pc_id,
+          pc_name: device.pc_name,
+          ip_address: device.ip_address,
+          status: device.status
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (error:any) {
+        errors.push({
+          pc_id: deviceData.pc_id,
+          error: error.message
+        });
+      }
+    }
+
+    // console.log(`✅ Bulk registration complete: ${registeredDevices.length} successful, ${errors.length} errors`);
+
+    return {
+      registered_devices: registeredDevices,
+      errors: errors,
+      summary: {
+        total_attempted: devices.length,
+        successful: registeredDevices.length,
+        failed: errors.length
+      }
+    };
+  }
+
+  // 🆕 Check if device exists (for network discovery)
+  async checkDeviceExists(params: { loungeId: string, pc_id: string, ip_address: string }) {
+    const { loungeId, pc_id, ip_address } = params;
+
+    const existingDevice = await this._deviceRepository.checkDeviceExists(loungeId, pc_id, ip_address);
+
+    return {
+      exists: !!existingDevice,
+      device: existingDevice ? {
+        id: existingDevice._id,
+        pc_id: existingDevice.pc_id,
+        pc_name: existingDevice.pc_name,
+        ip_address: existingDevice.ip_address,
+        status: existingDevice.status
+      } : null
+    };
+  }
 
   async getAllDevices(params: { loungeId: string; status?: string }) {
     const { loungeId, status } = params;

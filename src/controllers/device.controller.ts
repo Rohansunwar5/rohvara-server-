@@ -11,6 +11,47 @@ export const registerDevice = async (req:Request, res: Response, next: NextFunct
 
 };
 
+export const registerDiscoveredDevice = async (req: Request, res: Response, next: NextFunction) => {
+  const { pc_id, pc_name, ip_address, mac_address, specs } = req.body;
+  const loungeId = req.superUser.loungeId;
+
+  const response = await deviceService.registerDiscoveredDevice({
+    loungeId,
+    pc_id,
+    pc_name,
+    ip_address,
+    mac_address,
+    specs
+  });
+
+  next(response);
+};
+
+export const registerMultipleDevices = async (req: Request, res: Response, next: NextFunction) => {
+  const { devices } = req.body;
+  const loungeId = req.superUser.loungeId;
+
+  const response = await deviceService.registerMultipleDevices({
+    loungeId,
+    devices
+  });
+
+  next(response);
+};
+
+export const checkDeviceExists = async (req: Request, res: Response, next: NextFunction) => {
+  const { pc_id, ip_address } = req.query;
+  const loungeId = req.superUser.loungeId;
+
+  const response = await deviceService.checkDeviceExists({
+    loungeId,
+    pc_id: pc_id as string,
+    ip_address: ip_address as string
+  });
+
+  next(response);
+};
+
 export const getAllDevices = async (req: Request, res: Response, next: NextFunction) => {
   const { status } = req.query;
   const loungeId = req.superUser.loungeId;

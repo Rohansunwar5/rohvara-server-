@@ -26,6 +26,14 @@ const superUserSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    current_local_ip: {
+        type: String,
+        default: null,
+    },
+    last_network_range: {
+        type: String,
+        default: null
+    },
     settings: {
         hourly_rate: {
             type: Number,
@@ -52,6 +60,8 @@ export interface ISuperUser extends mongoose.Document {
     email: string | null;
     lounge_name: string;
     last_login: Date | null;
+    current_local_ip: string;
+    last_network_range: string;
     settings: {
         hourly_rate: number;
         currency: string;

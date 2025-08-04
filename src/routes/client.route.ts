@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asynchandler';
-import { authenticatePlayer, checkCommands, sessionLogout, updateStatus, updateHeartbeat } from '../controllers/client.controller';
+import { authenticatePlayer, checkCommands, sessionLogout, updateStatus, updateHeartbeat, reportError } from '../controllers/client.controller';
 import { authenticatePlayerValidator, pcIdValidator, reportErrorValidator, sessionLogoutValidator, updateStatusValidator } from '../middlewares/validators/client.validator';
 
 const clientRouter = Router();

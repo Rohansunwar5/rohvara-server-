@@ -15,8 +15,6 @@ import redisClient from './services/cache';
   const numCPUs = process.env.NODE_ENV === 'production' ? os.cpus().length : 1;
   if (cluster.isMaster) {
     logger.info(`Master ${process.pid} is running`);
-
-    // Fork workers...
     for (let i = 0; i < numCPUs; i++) {
       cluster.fork();
     }
@@ -72,5 +70,15 @@ import redisClient from './services/cache';
 
     app.listen(port, onListening);
     logger.info(`Worker ${process.pid} started`);
+
+    process.on('SIGTERM', async () => {
+      logger.info('SIGTERM received, shutting down gracefully...');
+      process.exit(0);
+    });
+
+    process.on('SIGINT', async () => {
+      logger.info('SIGINT received, shutting down gracefully...');
+      process.exit(0);
+    });
   }
 })();

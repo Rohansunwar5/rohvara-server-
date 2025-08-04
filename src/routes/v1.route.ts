@@ -6,6 +6,9 @@ import contactRouter from './contact.route';
 import sessionRouter from './session.route';
 import deviceRouter from './device.route';
 import clientRouter from './client.route';
+import playerRouter from './player.route';
+import networkRouter from './network.route';
+// import queueRouter from './queue.route';
 
 const v1Router = Router();
 
@@ -16,6 +19,9 @@ v1Router.use('/contact', contactRouter);
 v1Router.get('/country', asyncHandler(country));
 v1Router.use('/session', sessionRouter);
 v1Router.use('/device', deviceRouter);
+v1Router.use('/player', playerRouter);
 v1Router.use('/client', clientRouter);
+v1Router.use('/network', networkRouter);
+// v1Router.use('/queue', queueRouter);
 
 export default v1Router;

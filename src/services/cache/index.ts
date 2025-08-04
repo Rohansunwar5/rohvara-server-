@@ -1,10 +1,12 @@
 import * as redis from 'redis';
-import config from '../../config';
 import logger from '../../utils/logger';
 
+// Replace these with your actual Redis Cloud credentials
+const REDIS_URL = 'redis://default:Hie2Ze4t6SYBnozINBsJS2yeWWuURTz6@redis-13142.c62.us-east-1-4.ec2.redns.redis-cloud.com:13142';
+
 const redisClient = redis.createClient({
-  url: `redis://${config.REDIS_HOST}:${config.REDIS_PORT}`,
-  disableOfflineQueue: true
+  url: REDIS_URL,
+  disableOfflineQueue: true,
 });
 
 redisClient.on('ready', () => {

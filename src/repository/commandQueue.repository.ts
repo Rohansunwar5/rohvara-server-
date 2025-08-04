@@ -26,12 +26,26 @@ export class CommandQueueRepository {
     }
 
     async getPendingCommands(loungeId: string, pcId: string) {
-        return this._model.find({
+        // console.log(`🔍 CommandQueue: Searching for pending commands - loungeId: ${loungeId}, pcId: ${pcId}`);
+
+        const commands = await this._model.find({
             lounge_id: loungeId,
             pc_id: pcId,
             status: CommandQueueStatus.PENDING,
             expires_at: { $gt: new Date() }
         }).sort({ createdAt: 1 });
+
+        // console.log(`📋 CommandQueue: Found ${commands.length} commands`);
+        if (commands.length > 0) {
+            // console.log('📋 Commands details:', commands.map(cmd => ({
+            //     id: cmd._id,
+            //     command: cmd.command,
+            //     status: cmd.status,
+            //     expires_at: cmd.expires_at
+            // })));
+        }
+
+        return commands;
     }
 
     async markCommandAsExecuted(loungeId: string, commandId: string) {

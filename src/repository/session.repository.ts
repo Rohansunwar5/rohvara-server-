@@ -1,4 +1,4 @@
-import sessionModel, { EndedBy, SessionStatus } from '../models/session.model';
+import sessionModel, { EndedBy, ISession, SessionStatus } from '../models/session.model';
 
 export interface ICreateSessionParams {
     player_id: string;
@@ -7,20 +7,29 @@ export interface ICreateSessionParams {
     player_username: string;
     allocated_minutes: number;
     credits_used: number;
+    remaining_minutes: number;
+    session_end_time: Date; // ADD THIS
+    warning_time: Date;
 }
 
 export interface IUpdateSessionParams {
     _id: string;
     remaining_minutes?: number;
-    game_launched?: string | null;
+    allocated_minutes?: number; // Add this field
+    credits_used?: number; // Add this field
     status?: SessionStatus;
-    ended_by?: EndedBy | null;
-    session_end?: Date | null;
-    notes?: string | null;
+    game_launched?: string;
+    notes?: string;
 }
 
 export class SessionRepository {
     private _model = sessionModel;
+
+    async getAllActiveSessionsGlobal(): Promise<ISession[]> {
+    return this._model.find({
+        status: SessionStatus.ACTIVE
+    }).sort({ createdAt: -1 });
+}
 
     async createSession(loungeId: string, params: ICreateSessionParams) {
         return this._model.create({
@@ -32,6 +41,8 @@ export class SessionRepository {
             allocated_minutes: params.allocated_minutes,
             remaining_minutes: params.allocated_minutes,
             credits_used: params.credits_used,
+            session_end_time: params.session_end_time,
+            warning_time: params.warning_time,
             status: SessionStatus.ACTIVE
         });
     }
@@ -47,6 +58,7 @@ export class SessionRepository {
             status: SessionStatus.ACTIVE
         });
     }
+
 
     async getActiveSessionByDevice(loungeId: string, deviceId: string) {
         return this._model.findOne({
@@ -79,41 +91,23 @@ export class SessionRepository {
         return this._model.find(filter).sort({ createdAt: -1 });
     }
 
-    async updateSession(loungeId: string, params: IUpdateSessionParams) {
+    async updateSession(loungeId: string, params: IUpdateSessionParams): Promise<ISession | null> {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: any = {};
 
-        if (params.remaining_minutes !== null) {
-            updateData.remaining_minutes = params.remaining_minutes;
-        }
+        if (params.remaining_minutes !== undefined) updateData.remaining_minutes = params.remaining_minutes;
+        if (params.allocated_minutes !== undefined) updateData.allocated_minutes = params.allocated_minutes;
+        if (params.credits_used !== undefined) updateData.credits_used = params.credits_used;
+        if (params.status) updateData.status = params.status;
+        if (params.game_launched) updateData.game_launched = params.game_launched;
+        if (params.notes) updateData.notes = params.notes;
 
-        if (params.game_launched !== null) {
-            updateData.game_launched = params.game_launched;
-        }
-
-        if (params.status) {
-            updateData.status = params.status;
-        }
-
-        if (params.ended_by !== null) {
-            updateData.ended_by = params.ended_by;
-        }
-
-        if (params.session_end !== null) {
-            updateData.session_end = params.session_end;
-        }
-
-        if (params.notes !== null) {
-            updateData.notes = params.notes;
-        }
-
-        return this._model.findOneAndUpdate(
-            { lounge_id: loungeId, _id: params._id },
-            updateData,
+        return await this._model.findOneAndUpdate(
+            { _id: params._id, lounge_id: loungeId },
+            { $set: updateData },
             { new: true }
         );
     }
-
     async updateSessionTime(loungeId: string, sessionId: string, remainingMinutes: number) {
         return this._model.findOneAndUpdate(
             { lounge_id: loungeId, _id: sessionId },
@@ -176,5 +170,18 @@ export class SessionRepository {
                 }
             }
         ]);
+    }
+
+    async batchUpdateRemainingMinutes(updates: Array<{ sessionId: string; remainingMinutes: number }>): Promise<void> {
+        const bulkOps = updates.map(update => ({
+            updateOne: {
+                filter: { _id: update.sessionId },
+                update: { $set: { remaining_minutes: update.remainingMinutes } }
+            }
+        }));
+
+        if (bulkOps.length > 0) {
+            await this._model.bulkWrite(bulkOps);
+        }
     }
 }

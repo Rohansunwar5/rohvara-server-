@@ -1,19 +1,28 @@
+import cluster from 'cluster';
 import { BadRequestError } from '../errors/bad-request.error';
 import { NotFoundError } from '../errors/not-found.error';
+import { CommandType } from '../models/commandQueue.model';
 import { DeviceStatus } from '../models/device.model';
 import { EndedBy, SessionStatus } from '../models/session.model';
 import { TransactionType } from '../models/transaction.model';
+import { CommandQueueRepository } from '../repository/commandQueue.repository';
 import { DeviceRepository } from '../repository/device.repository';
 import { PlayerRepository } from '../repository/player.repository';
 import { ICreateSessionParams, IUpdateSessionParams, SessionRepository } from '../repository/session.repository';
+import { SuperUserRepository } from '../repository/superUser.repository';
 import { TransactionRepository } from '../repository/transaction.repository';
+import logger from '../utils/logger';
+import SessionQueueService from './queue/sessionQueue.service';
 
 class SessionService {
     constructor(
         private readonly _sessionRepository: SessionRepository,
         private readonly _playerRepository: PlayerRepository,
         private readonly _deviceRepository: DeviceRepository,
-        private readonly _transactionRepository: TransactionRepository
+        private readonly _transactionRepository: TransactionRepository,
+        private readonly _commandQueueRepository: CommandQueueRepository,
+        private readonly _superUserRepository: SuperUserRepository,
+        private readonly _sessionQueueService: SessionQueueService,
     ) {}
 
     async startSession(params: { loungeId: string, playerId: string, deviceId: string, minutes: number }) {
@@ -51,14 +60,25 @@ class SessionService {
             throw new BadRequestError('Failed to deduct credits');
         }
 
-        // Create session params
+        const superUser = await this._superUserRepository.getSuperUserById(loungeId);
+        const warningMinute = superUser?.settings?.session_warning_minutes || 5;
+
+        // Calculate end times
+        const now = new Date();
+        const sessionEndTime = new Date(now.getTime() + (minutes * 60 * 1000));
+        const warningTime = new Date(sessionEndTime.getTime() - (warningMinute * 60 * 1000));
+
+        // Create session params with end times
         const sessionParams: ICreateSessionParams = {
             player_id: playerId,
             device_id: deviceId,
             pc_id: device.pc_id,
             player_username: player.username,
             allocated_minutes: minutes,
-            credits_used: minutes
+            credits_used: minutes,
+            remaining_minutes: minutes,
+            session_end_time: sessionEndTime, // ADD THIS
+            warning_time: warningTime // ADD THIS
         };
 
         // Create session
@@ -72,6 +92,18 @@ class SessionService {
             current_session_id: session._id
         });
 
+        await this._commandQueueRepository.createCommand(loungeId, {
+            pc_id: device.pc_id,
+            command: CommandType.START_SESSION,
+            data: {
+                player_id: playerId,
+                session_id: session._id,
+                allocated_minutes: minutes,
+                message: `Session started for ${player.username}`
+            },
+            created_by_id: playerId
+        });
+
         // Create transaction record
         await this._transactionRepository.createTransaction(loungeId, {
             player_id: playerId,
@@ -81,6 +113,20 @@ class SessionService {
             description: `Session started on ${device.pc_name}`,
             session_id: session._id,
             created_by_id: playerId
+        });
+
+        // const superUser = await this._superUserRepository.getSuperUserById(loungeId);
+        const warningMinutes = superUser?.settings?.session_warning_minutes || 5;
+
+        await this._sessionQueueService.scheduleSessionExpiry({
+            sessionId: session._id,
+            loungeId,
+            playerId,
+            deviceId,
+            pcId: device.pc_id,
+            playerUsername: player.username,
+            allocatedMinutes: minutes,
+            warningMinutes
         });
 
         return {
@@ -93,6 +139,8 @@ class SessionService {
                 allocated_minutes: session.allocated_minutes,
                 remaining_minutes: session.remaining_minutes,
                 status: session.status,
+                session_end_time: sessionEndTime.toISOString(),
+                warning_time: warningTime.toISOString(),
                 createdAt: session.createdAt
             },
             player: {
@@ -105,6 +153,79 @@ class SessionService {
                 pc_id: device.pc_id,
                 pc_name: device.pc_name,
                 status: DeviceStatus.IN_USE
+            }
+        };
+    }
+
+    async extendSession(params: { loungeId: string, sessionId: string, additionalMinutes: number, createdById: string }) {
+        const { loungeId, sessionId, additionalMinutes, createdById } = params;
+
+        const session = await this._sessionRepository.getSessionById(loungeId, sessionId);
+        if (!session) throw new NotFoundError('Session not found');
+
+        if (session.status !== SessionStatus.ACTIVE) {
+            throw new BadRequestError('Session is not active');
+        }
+
+        const player = await this._playerRepository.getPlayerById(loungeId, session.player_id);
+        if (!player) throw new NotFoundError('Player not found');
+
+        if (player.credit_balance < additionalMinutes) {
+            throw new BadRequestError('Insufficient credits to extend session');
+        }
+
+        const deductedPlayer = await this._playerRepository.deductCredits(
+            loungeId,
+            session.player_id,
+            additionalMinutes
+        );
+
+        if (!deductedPlayer) throw new BadRequestError('Failed to deduct credits');
+
+        const newRemainingMinutes = session.remaining_minutes + additionalMinutes;
+        const newAllocatedMinutes = session.allocated_minutes + additionalMinutes;
+
+        const updateParams: IUpdateSessionParams = {
+            _id: sessionId,
+            remaining_minutes: newRemainingMinutes
+        };
+
+        const updatedSession = await this._sessionRepository.updateSession(loungeId, updateParams);
+        if (!updatedSession) throw new BadRequestError('Failed to extend session');
+
+        await this._transactionRepository.createTransaction(loungeId, {
+            player_id: session.player_id,
+            player_username: session.player_username,
+            type: TransactionType.CREDIT_DEDUCTION,
+            amount: additionalMinutes,
+            description: `Session extended by ${additionalMinutes} minutes`,
+            session_id: sessionId,
+            created_by_id: createdById
+        });
+
+        const superUser = await this._superUserRepository.getSuperUserById(loungeId);
+        const warningMinutes = superUser?.settings?.session_warning_minutes || 5;
+
+        await this._sessionQueueService.extendSessionSchedule({
+            sessionId,
+            loungeId,
+            additionalMinutes,
+            totalRemainingMinutes: newRemainingMinutes,
+            pcId: session.pc_id,
+            playerUsername: session.player_username,
+            warningMinutes
+        });
+
+        return {
+            session: {
+                id: updatedSession._id,
+                allocated_minutes: newAllocatedMinutes,
+                remaining_minutes: updatedSession.remaining_minutes,
+                credits_used: updatedSession.credits_used + additionalMinutes
+            },
+            player: {
+                id: deductedPlayer._id,
+                credit_balance: deductedPlayer.credit_balance
             }
         };
     }
@@ -135,11 +256,23 @@ class SessionService {
 
         if(!endedSession) throw new BadRequestError('Failed to end session');
 
+        await this._sessionQueueService.cancelSessionJobs(sessionId);
+
         await this._deviceRepository.updateDeviceStatus(loungeId, {
             device_id: session.device_id,
             status: DeviceStatus.AVAILABLE,
             current_user_id: null,
             current_session_id: null
+        });
+
+        await this._commandQueueRepository.createCommand(loungeId, {
+            pc_id: session.pc_id,
+            command: CommandType.END_SESSION,
+            data: {
+                session_id: sessionId,
+                message: notes || 'Session ended by administrator'
+            },
+            created_by_id: session.player_id
         });
 
         return {
@@ -156,6 +289,30 @@ class SessionService {
                 notes: endedSession.notes
             }
         };
+    }
+
+    async updateRemainingTime(loungeId: string, sessionId: string, elapsedMinutes: number): Promise<void> {
+        const session = await this._sessionRepository.getSessionById(loungeId, sessionId);
+        if (!session || session.status !== SessionStatus.ACTIVE) {
+            return;
+        }
+
+        const newRemainingMinutes = Math.max(0, session.allocated_minutes - elapsedMinutes);
+
+        await this._sessionRepository.updateSession(loungeId, {
+            _id: sessionId,
+            remaining_minutes: newRemainingMinutes
+        });
+
+        // If time is up, the scheduled job will handle ending the session
+        if (newRemainingMinutes === 0) {
+            logger.info(`Session ${sessionId} has no remaining time, waiting for scheduled job to end it`);
+        }
+    }
+
+    // Get queue statistics
+    async getQueueStats() {
+        return await this._sessionQueueService.getQueueStats();
     }
 
     async getAllActiveSessions(params: { loungeId: string }) {
@@ -265,65 +422,6 @@ class SessionService {
         };
     }
 
-    async extendSession(params: { loungeId: string, sessionId: string, additionalMinutes: number, createdById: string }) {
-        const { loungeId, sessionId, additionalMinutes, createdById } = params;
-
-        const session = await this._sessionRepository.getSessionById(loungeId, sessionId);
-        if (!session) throw new NotFoundError('Session not found');
-
-        if (session.status !== SessionStatus.ACTIVE) {
-            throw new BadRequestError('Session is not active');
-        }
-
-        const player = await this._playerRepository.getPlayerById(loungeId, session.player_id);
-        if (!player) throw new NotFoundError('Player not found');
-
-        if (player.credit_balance < additionalMinutes) {
-            throw new BadRequestError('Insufficient credits to extend session');
-        }
-
-        const deductedPlayer = await this._playerRepository.deductCredits(
-            loungeId,
-            session.player_id,
-            additionalMinutes
-        );
-
-        if (!deductedPlayer) throw new BadRequestError('Failed to deduct credits');
-
-        const newRemainingMinutes = session.remaining_minutes + additionalMinutes;
-        const newAllocatedMinutes = session.allocated_minutes + additionalMinutes;
-
-        const updateParams: IUpdateSessionParams = {
-            _id: sessionId,
-            remaining_minutes: newRemainingMinutes
-        };
-
-        const updatedSession = await this._sessionRepository.updateSession(loungeId, updateParams);
-        if (!updatedSession) throw new BadRequestError('Failed to extend session');
-
-        await this._transactionRepository.createTransaction(loungeId, {
-            player_id: session.player_id,
-            player_username: session.player_username,
-            type: TransactionType.CREDIT_DEDUCTION,
-            amount: additionalMinutes,
-            description: `Session extended by ${additionalMinutes} minutes`,
-            session_id: sessionId,
-            created_by_id: createdById
-        });
-
-        return {
-            session: {
-                id: updatedSession._id,
-                allocated_minutes: newAllocatedMinutes,
-                remaining_minutes: updatedSession.remaining_minutes,
-                credits_used: updatedSession.credits_used + additionalMinutes
-            },
-            player: {
-                id: deductedPlayer._id,
-                credit_balance: deductedPlayer.credit_balance
-            }
-        };
-    }
 
     async getSessionStats(params: { loungeId: string }) {
         const { loungeId } = params;
@@ -409,5 +507,37 @@ class SessionService {
         };
     }
 }
+const sessionQueueService = new SessionQueueService(
+    new SessionRepository(),
+    new DeviceRepository(),
+    new CommandQueueRepository(),
+    new TransactionRepository(),
+    new PlayerRepository()
+);
 
-export default new SessionService( new SessionRepository(), new PlayerRepository(), new DeviceRepository, new TransactionRepository());
+setImmediate(async () => {
+    try {
+        // Only initialize in worker processes, specifically worker 1
+        if (cluster.isWorker && cluster.worker?.id === 1) {
+            await sessionQueueService.initialize();
+            logger.info('SessionQueueService initialized on worker 1');
+        } else if (!cluster.isMaster && !cluster.isWorker) {
+            // Non-clustered environment
+            await sessionQueueService.initialize();
+            logger.info('SessionQueueService initialized in non-clustered mode');
+        }
+    } catch (error) {
+        logger.error('Failed to initialize SessionQueueService:', error);
+    }
+});
+
+// Then modify your export to use the sessionQueueService variable:
+export default new SessionService(
+    new SessionRepository(),
+    new PlayerRepository(),
+    new DeviceRepository(),
+    new TransactionRepository(),
+    new CommandQueueRepository(),
+    new SuperUserRepository(),
+    sessionQueueService // <- Use the variable instead of creating new instance
+);

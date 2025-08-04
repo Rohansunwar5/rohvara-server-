@@ -1,3 +1,4 @@
+import cluster from 'cluster';
 import bcrypt from 'bcrypt';
 import { NotFoundError } from '../errors/not-found.error';
 import { UnauthorizedError } from '../errors/unauthorized.error';
@@ -10,13 +11,20 @@ import { BadRequestError } from '../errors/bad-request.error';
 import { CommandType } from '../models/commandQueue.model';
 import { EndedBy, SessionStatus } from '../models/session.model';
 import logger from '../utils/logger';
+import { TransactionType } from '../models/transaction.model';
+import { TransactionRepository } from '../repository/transaction.repository';
+import { SuperUserRepository } from '../repository/superUser.repository';
+import SessionQueueService from './queue/sessionQueue.service';
 
 class ClientService {
     constructor (
         private readonly _playerRepository: PlayerRepository,
         private readonly _deviceRepository: DeviceRepository,
         private readonly _sessionRepository: SessionRepository,
-        private readonly _commandQueueRepository: CommandQueueRepository
+        private readonly _commandQueueRepository: CommandQueueRepository,
+        private readonly _transactionRepository: TransactionRepository,
+        private readonly _superUserRepository: SuperUserRepository,
+        private readonly _sessionQueueService: SessionQueueService
     ) {}
 
     async authenticatePlayer(params: { pcId: string, username: string, password: string }) {
@@ -31,7 +39,6 @@ class ClientService {
             throw new BadRequestError('PC is not available');
         }
 
-        // Get player by username in this lounge
         const player = await this._playerRepository.getPlayerByUsername(loungeId, username);
         if (!player) throw new NotFoundError('Invalid username or password');
 
@@ -39,33 +46,99 @@ class ClientService {
             throw new UnauthorizedError('Player account is not active');
         }
 
-        // Verify password
         const isPasswordValid = await bcrypt.compare(password, player.password);
         if (!isPasswordValid) throw new UnauthorizedError('Invalid username or password');
 
-        // Check if player has credits
         if (player.credit_balance <= 0) {
             throw new BadRequestError('Insufficient credits. Please contact staff.');
         }
 
-        // Check if player already has an active session
         const existingSession = await this._sessionRepository.getActiveSessionByPlayer(loungeId, player._id);
         if (existingSession) {
             throw new BadRequestError('Player already has an active session on another PC');
         }
 
-        await this._playerRepository.updateLastLogin(loungeId, player._id);
+        const existingDeviceSession = await this._sessionRepository.getActiveSessionByDevice(loungeId, device._id);
+        if (existingDeviceSession) {
+            throw new BadRequestError('PC already has an active session');
+        }
 
-        await this._commandQueueRepository.createCommand(loungeId, {
-            pc_id: pcId,
-            command: CommandType.START_SESSION,
-            data: {
-                player_id: player._id,
-                allocated_minutes: Math.min(player.credit_balance, 120), // Max 2 hours at once
-                message: `Welcome ${player.display_name || player.username}!`
-            },
+        const sessionMinutes = Math.min(player.credit_balance, 120);
+
+        const deductedPlayer = await this._playerRepository.deductCredits(loungeId, player._id, sessionMinutes);
+        if (!deductedPlayer) {
+            throw new BadRequestError('Failed to deduct credits');
+        }
+
+        const superUser = await this._superUserRepository.getSuperUserById(loungeId);
+
+        const now = new Date();
+        const sessionEndTime = new Date(now.getTime() + (sessionMinutes * 60 * 1000));
+        const warningMinute = superUser?.settings?.session_warning_minutes || 5;
+        const warningTime = new Date(sessionEndTime.getTime() - (warningMinute * 60 * 1000));
+
+        // console.log('🎮 Creating session document...');
+        const session = await this._sessionRepository.createSession(loungeId, {
+            player_id: player._id,
+            device_id: device._id,
+            pc_id: device.pc_id,
+            player_username: player.username,
+            allocated_minutes: sessionMinutes,
+            credits_used: sessionMinutes,
+            remaining_minutes: sessionMinutes,
+            session_end_time: sessionEndTime,
+            warning_time: warningTime
+        });
+        // console.log('✅ Session created:', session._id);
+
+        await this._deviceRepository.updateDeviceStatus(loungeId, {
+            device_id: device._id,
+            status: DeviceStatus.IN_USE,
+            current_user_id: player._id,
+            current_session_id: session._id
+        });
+
+        await this._transactionRepository.createTransaction(loungeId, {
+            player_id: player._id,
+            player_username: player.username,
+            type: TransactionType.CREDIT_DEDUCTION,
+            amount: sessionMinutes,
+            description: `Session started on ${device.pc_name}`,
+            session_id: session._id,
             created_by_id: player._id
         });
+
+
+        const warningMinutes = superUser?.settings?.session_warning_minutes || 5;
+
+        await this._sessionQueueService.scheduleSessionExpiry({
+            sessionId: session._id,
+            loungeId,
+            playerId: player._id,
+            deviceId: device._id,
+            pcId: device.pc_id,
+            playerUsername: player.username,
+            allocatedMinutes: sessionMinutes,
+            warningMinutes
+        });
+
+        await this._playerRepository.updateLastLogin(loungeId, player._id);
+
+        // Create START_SESSION command for PC
+        // console.log('🎮 Creating START_SESSION command...');
+        // const command = await this._commandQueueRepository.createCommand(loungeId, {
+        //     pc_id: pcId,
+        //     command: CommandType.START_SESSION,
+        //     data: {
+        //         player_id: player._id,
+        //         session_id: session._id,
+        //         allocated_minutes: sessionMinutes,
+        //         message: `Welcome ${player.display_name || player.username}!`
+        //     },
+        //     created_by_id: player._id
+        // });
+        // console.log('✅ START_SESSION command created:', command._id);
+
 
         return {
             success: true,
@@ -73,12 +146,20 @@ class ClientService {
                 id: player._id,
                 username: player.username,
                 display_name: player.display_name,
-                credit_balance: player.credit_balance
+                credit_balance: deductedPlayer.credit_balance
             },
             device: {
                 id: device._id,
                 pc_id: device.pc_id,
                 pc_name: device.pc_name
+            },
+            session: {
+                id: session._id,
+                allocated_minutes: sessionMinutes,
+                remaining_minutes: sessionMinutes,
+                status: session.status,
+                session_end_time: sessionEndTime.toISOString(),
+                warning_time: warningTime.toISOString()
             },
             message: 'Authentication successful. Session will start shortly.'
         };
@@ -91,12 +172,14 @@ class ClientService {
         if (!device) throw new NotFoundError('PC not registered');
 
         const loungeId = device.lounge_id;
+        // console.log(`🔍 Checking commands for PC: ${pcId}, lounge: ${loungeId}`);
 
         // Update heartbeat
         await this._deviceRepository.updateHeartbeat(loungeId, pcId);
 
         // Get pending commands for this PC
         const commands = await this._commandQueueRepository.getPendingCommands(loungeId, pcId);
+        // console.log(`📋 Found ${commands.length} pending commands for ${pcId}`);
 
         if (commands.length === 0) {
             return {
@@ -106,8 +189,12 @@ class ClientService {
             };
         }
 
+        // console.log('📋 Commands found:', commands.map(cmd => ({ id: cmd._id, command: cmd.command })));
+
         const commandIds = commands.map(cmd => cmd._id);
         await this._commandQueueRepository.markCommandsAsExecuted(loungeId, commandIds);
+        // console.log('✅ Marked commands as executed:', commandIds);
+
 
         return {
             commands: commands.map(command => ({
@@ -121,91 +208,86 @@ class ClientService {
         };
     }
 
-    async updateStatus(params: {
-    pcId: string;
-    status: string;
-    currentSessionTime?: number;
-    gameLaunched?: string;
-}) {
-    const { pcId, status, currentSessionTime, gameLaunched } = params;
+    async updateStatus(params: { pcId: string, status: string, currentSessionTime?: number, gameLaunched?: string }) {
+        const { pcId, status, currentSessionTime, gameLaunched } = params;
 
-    // Get device to find lounge
-    const device = await this._deviceRepository.getDeviceByPcId('', pcId);
-    if (!device) throw new NotFoundError('PC not registered');
+        // Get device to find lounge
+        const device = await this._deviceRepository.getDeviceByPcId('', pcId);
+        if (!device) throw new NotFoundError('PC not registered');
 
-    const loungeId = device.lounge_id;
+        const loungeId = device.lounge_id;
 
-    // Convert status to enum
-    let deviceStatus: DeviceStatus;
-    if (status === 'available') deviceStatus = DeviceStatus.AVAILABLE;
-    else if (status === 'in_use') deviceStatus = DeviceStatus.IN_USE;
-    else if (status === 'offline') deviceStatus = DeviceStatus.OFFLINE;
-    else if (status === 'maintenance') deviceStatus = DeviceStatus.MAINTENANCE;
-    else throw new BadRequestError('Invalid status');
+        // Convert status to enum
+        let deviceStatus: DeviceStatus;
+        if (status === 'available') deviceStatus = DeviceStatus.AVAILABLE;
+        else if (status === 'in_use') deviceStatus = DeviceStatus.IN_USE;
+        else if (status === 'offline') deviceStatus = DeviceStatus.OFFLINE;
+        else if (status === 'maintenance') deviceStatus = DeviceStatus.MAINTENANCE;
+        else throw new BadRequestError('Invalid status');
 
-    // Update device status
-    await this._deviceRepository.updateDeviceStatus(loungeId, {
-        device_id: device._id,
-        status: deviceStatus,
-        current_user_id: device.current_user_id,
-        current_session_id: device.current_session_id
-    });
+        // Update device status
+        await this._deviceRepository.updateDeviceStatus(loungeId, {
+            device_id: device._id,
+            status: deviceStatus,
+            current_user_id: device.current_user_id,
+            current_session_id: device.current_session_id
+        });
 
-    // If there's an active session, update session info
-    if (device.current_session_id) {
-        const session = await this._sessionRepository.getSessionById(loungeId, device.current_session_id);
+        // If there's an active session, update session info
+        if (device.current_session_id) {
+            const session = await this._sessionRepository.getSessionById(loungeId, device.current_session_id);
 
-        if (session && session.status === SessionStatus.ACTIVE) {
-            // Handle session time update
-            const hasValidSessionTime = typeof currentSessionTime === 'number' && currentSessionTime >= 0;
-            if (hasValidSessionTime) {
-                await this._sessionRepository.updateSessionTime(
-                    loungeId,
-                    session._id,
-                    currentSessionTime as number
-                );
-            }
+            if (session && session.status === SessionStatus.ACTIVE) {
+                // Handle session time update
+                const hasValidSessionTime = typeof currentSessionTime === 'number' && currentSessionTime >= 0;
+                if (hasValidSessionTime) {
+                    await this._sessionRepository.updateSessionTime(
+                        loungeId,
+                        session._id,
+                        currentSessionTime as number
+                    );
+                }
 
-            // Handle game launched update
-            const hasGameLaunched = typeof gameLaunched === 'string' && gameLaunched.length > 0;
-            if (hasGameLaunched) {
-                await this._sessionRepository.updateSession(loungeId, {
-                    _id: session._id,
-                    game_launched: gameLaunched as string
-                });
-            }
+                // Handle game launched update
+                const hasGameLaunched = typeof gameLaunched === 'string' && gameLaunched.length > 0;
+                if (hasGameLaunched) {
+                    await this._sessionRepository.updateSession(loungeId, {
+                        _id: session._id,
+                        game_launched: gameLaunched as string
+                    });
+                }
 
-            // Check if session expired
-            const isSessionExpired = typeof currentSessionTime === 'number' && currentSessionTime <= 0;
-            if (isSessionExpired) {
-                await this._sessionRepository.endSession(
-                    loungeId,
-                    session._id,
-                    EndedBy.TIMEOUT,
-                    'Session expired - time ran out'
-                );
+                // Check if session expired
+                const isSessionExpired = typeof currentSessionTime === 'number' && currentSessionTime <= 0;
+                if (isSessionExpired) {
+                    await this._sessionRepository.endSession(
+                        loungeId,
+                        session._id,
+                        EndedBy.TIMEOUT,
+                        'Session expired - time ran out'
+                    );
 
-                // Create END_SESSION command
-                await this._commandQueueRepository.createCommand(loungeId, {
-                    pc_id: pcId,
-                    command: CommandType.END_SESSION,
-                    data: {
-                        session_id: session._id,
-                        message: 'Your session has expired. Thank you for playing!'
-                    },
-                    created_by_id: session.player_id
-                });
+                    // Create END_SESSION command
+                    await this._commandQueueRepository.createCommand(loungeId, {
+                        pc_id: pcId,
+                        command: CommandType.END_SESSION,
+                        data: {
+                            session_id: session._id,
+                            message: 'Your session has expired. Thank you for playing!'
+                        },
+                        created_by_id: session.player_id
+                    });
+                }
             }
         }
-    }
 
-    return {
-        success: true,
-        pc_id: pcId,
-        status: deviceStatus,
-        timestamp: new Date().toISOString()
-    };
-}
+        return {
+            success: true,
+            pc_id: pcId,
+            status: deviceStatus,
+            timestamp: new Date().toISOString()
+        };
+    }
 
     async updateHeartbeat(params: { pcId: string }) {
         const { pcId } = params;
@@ -317,9 +399,34 @@ class ClientService {
     }
 }
 
+const sessionQueueService = new SessionQueueService(
+    new SessionRepository(),
+    new DeviceRepository(),
+    new CommandQueueRepository(),
+    new TransactionRepository(),
+    new PlayerRepository()
+);
+
+setImmediate(async () => {
+    try {
+        if (cluster.isWorker && cluster.worker?.id === 1) {
+            await sessionQueueService.initialize();
+            logger.info('SessionQueueService initialized on worker 1');
+        } else if (!cluster.isMaster && !cluster.isWorker) {
+            await sessionQueueService.initialize();
+            logger.info('SessionQueueService initialized in non-clustered mode');
+        }
+    } catch (error) {
+        logger.error('Failed to initialize SessionQueueService:', error);
+    }
+});
+
 export default new ClientService(
     new PlayerRepository(),
     new DeviceRepository(),
     new SessionRepository(),
-    new CommandQueueRepository()
+    new CommandQueueRepository(),
+    new TransactionRepository(),
+    new SuperUserRepository(),
+    sessionQueueService
 );

@@ -36,6 +36,9 @@ class PlayerService {
 
     async addCredits(params: { loungeId: string, playerId: string, minutes: number, price: number, createdById: string }) {
         const { loungeId, playerId, minutes, price, createdById } = params;
+        // console.log("loungeId: ", loungeId);
+        // console.log("playerId: ", playerId);
+
 
         const player = await this._playerRepository.getPlayerById(loungeId, playerId);
         if (!player) throw new NotFoundError('Player not found');

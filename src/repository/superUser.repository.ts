@@ -6,6 +6,8 @@ export interface ICreateSuperUserParams {
     password: string;
     email?: string | null;
     lounge_name: string;
+    current_local_ip?: string;
+    last_network_range?: string;
 }
 
 export interface IUpdateSuperUserParams {
@@ -18,6 +20,11 @@ export interface IUpdateSuperUserParams {
         timezone?: string;
         session_warning_minutes?: number;
     };
+}
+
+export interface IUpdateNetworkInfoParams {
+    current_local_ip: string;
+    last_network_range: string;
 }
 
 export class SuperUserRepository {
@@ -63,6 +70,31 @@ export class SuperUserRepository {
         await this._model.findByIdAndUpdate(id, { last_login: new Date() });
     }
 
+    async updateNetworkInfo(id: string, localIP: string, networkRange: string) {
+        // console.log(`🔄 Updating network info for user ${id}: IP=${localIP}, Range=${networkRange}`);
+
+        const result = await this._model.findByIdAndUpdate(id, {
+            last_login: new Date(),
+            current_local_ip: localIP,
+            last_network_range: networkRange
+        }, { new: true });
+
+        // console.log(`✅ Network info updated successfully for user ${id}`);
+        return result;
+    }
+
+    async getNetworkInfo(id: string) {
+        const user = await this._model.findById(id).select('current_local_ip last_network_range');
+
+        if(!user) return null;
+
+        return {
+            local_ip: user.current_local_ip,
+            network_range: user.last_network_range,
+            scan_ready: !!(user.current_local_ip && user.last_network_range)
+        };
+    }
+
     async getSuperUserByEmail(email: string) {
         return this._model.findOne({ email });
     }
@@ -73,5 +105,14 @@ export class SuperUserRepository {
             { password: hashedPassword },
             { new: true }
         ).select('-password');
+    }
+
+    async getSuperUserWithNetworkInfo(id: string) {
+        return this._model.findById(id).select('-password');
+    }
+
+    async hasValidNetworkInfo(id: string) {
+        const user = await this._model.findById(id).select('current_local_ip last_network_range');
+        return !!(user?.current_local_ip && user?.last_network_range);
     }
 }

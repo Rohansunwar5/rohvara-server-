@@ -344,5 +344,3 @@ class SessionQueueService {
 }
 
 export default SessionQueueService;
-
-// export default new SessionQueueService(new SessionRepository(), new DeviceRepository(), new CommandQueueRepository(), new TransactionRepository, new PlayerRepository());

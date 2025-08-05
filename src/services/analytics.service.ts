@@ -17,11 +17,6 @@ class AnalyticsService {
     return true;
   }
 
-  // async gameImpressions(gameId: string, fromDate: string, toDate: string) {
-  //   const impressions = await this._impressionRepository.get(gameId, fromDate, toDate);
-
-  //   return impressions;
-  // }
   async quizGameImpressionsAndSubmissions(gameId: string, fromDate: string, toDate: string) {
     const impressions = await this._impressionRepository.getQuizGameImpressionsAndSubmissions(gameId, fromDate, toDate);
 

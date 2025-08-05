@@ -14,7 +14,6 @@ sessionRouter.get('/date-range', isLoggedIn, dateRangeValidator, asyncHandler(ge
 sessionRouter.get('/player/:playerId', isLoggedIn, playerIdValidator, asyncHandler(getSessionsByPlayer));
 sessionRouter.get('/:sessionId', isLoggedIn, sessionIdValidator, asyncHandler(getSessionById));
 
-//session control
 sessionRouter.put('/:sessionId/end', isLoggedIn, endSessionValidator, asyncHandler(endSession));
 sessionRouter.put('/:sessionId/force-end', isLoggedIn, forceEndSessionValidator, asyncHandler(forceEndSession));
 sessionRouter.put('/sessionId/time', isLoggedIn, updateSessionTimeValidator, asyncHandler(updateSessionTime));

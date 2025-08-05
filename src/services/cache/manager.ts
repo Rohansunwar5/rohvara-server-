@@ -1,19 +1,6 @@
 import redisClient from '.';
 import config from '../../config';
 
-// const getCache = async (key: string) => {
-//   await redisClient.get(key);
-// };
-
-// // eslint-disable-next-line @typescript-eslint/no-explicit-any
-// const setCache = async (key: string, data: any, duration: number) => {
-//   await redisClient.setEx(key, duration, JSON.stringify(data));
-// };
-
-// const clearCache = async (key: string) => {
-//   await redisClient.del(key);
-// };
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const setNxInRedis = async (key: string, value: any) => {
   await redisClient.setNX(key, JSON.stringify(value));

@@ -113,7 +113,7 @@ export class DeviceRepository {
         //     newStatus: params.status,
         //     userId: params.current_user_id,
         //     sessionId: params.current_session_id
-        // });  
+        // });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: any = {

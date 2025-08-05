@@ -1,4 +1,3 @@
-// verify-superuser-token.middleware.ts
 import JWT from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { BadRequestError } from '../../errors/bad-request.error';
@@ -26,13 +25,11 @@ const getSuperUserAuthMiddlewareByJWTSecret = (jwtSecret: string) => async (
     const { userId } = JWT.verify(token, jwtSecret) as IJWTVerifyPayload;
     if (!userId) throw new UnauthorizedError('Invalid token payload');
 
-    // Verify super user exists
     const superUser = await SuperUser.findById(userId);
     if (!superUser) {
       throw new UnauthorizedError('Super user not found');
     }
 
-    // Set all required properties at once
     req.user = {
       _id: userId,
     };
